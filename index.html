@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ReserveLock">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Irrevocable deposit platform for high-demand restaurants">
+
+  <title>ReserveLock — Irrevocable Deposit Platform</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- iOS Icons -->
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="icon-192.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .gradient-text { background: linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    pre { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+    /* iOS safe areas */
+    .safe-top { padding-top: env(safe-area-inset-top); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* Smooth scrolling */
+    .scroll-smooth { -webkit-overflow-scrolling: touch; }
+
+    /* Hide scrollbars on mobile */
+    @media (max-width: 768px) {
+      ::-webkit-scrollbar { display: none; }
+      body { -ms-overflow-style: none; scrollbar-width: none; }
+    }
+
+    /* Touch-friendly buttons */
+    button, .btn { min-height: 44px; }
+
+    /* Prevent text selection on UI elements */
+    nav, button, .no-select { -webkit-user-select: none; user-select: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen safe-top safe-bottom">
+  <div id="app"></div>
+
+  <script>
+    // State Management
+    const state = {
+      currentView: 'landing',
+      bookingStep: 1,
+      selectedPayment: null,
+      dashboardTab: 'deposits',
+      selectedDeposit: null,
+      archTab: 'overview',
+      plaidConnected: false,
+      consentAccepted: false,
+      mobileMenuOpen: false
+    };
+
+    // Mock Data
+    const deposits = [
+      { id: 'DEP-001', guest: 'Sarah Chen', email: 'sarah@gmail.com', phone: '(415) 555-0123', date: '2026-02-07', time: '7:00 PM', party: 2, amount: 200, status: 'confirmed', method: 'ACH', bankLast4: '4521', settledAt: '2026-01-28 14:32:00', createdAt: '2026-01-28 14:30:12' },
+      { id: 'DEP-002', guest: 'Marcus Johnson', email: 'marcus.j@outlook.com', phone: '(628) 555-0456', date: '2026-02-07', time: '7:30 PM', party: 4, amount: 400, status: 'confirmed', method: 'Zelle', bankLast4: '8834', settledAt: '2026-01-29 09:15:00', createdAt: '2026-01-29 09:12:45' },
+      { id: 'DEP-003', guest: 'Emily Park', email: 'emilyp@icloud.com', phone: '(510) 555-0789', date: '2026-02-07', time: '8:00 PM', party: 2, amount: 200, status: 'settling', method: 'ACH', bankLast4: '2290', settledAt: null, createdAt: '2026-02-04 16:45:22' },
+      { id: 'DEP-004', guest: 'David Kim', email: 'dkim@gmail.com', phone: '(650) 555-0234', date: '2026-02-08', time: '6:30 PM', party: 2, amount: 200, status: 'pending', method: null, bankLast4: null, settledAt: null, createdAt: '2026-02-05 11:20:00' },
+      { id: 'DEP-005', guest: 'Jessica Liu', email: 'jliu@yahoo.com', phone: '(408) 555-0567', date: '2026-02-06', time: '7:00 PM', party: 2, amount: 200, status: 'refunded', method: 'ACH', bankLast4: '7712', settledAt: '2026-01-25 10:00:00', refundedAt: '2026-02-04 15:30:00', createdAt: '2026-01-25 09:55:00' },
+      { id: 'DEP-006', guest: 'Michael Torres', email: 'mtorres@gmail.com', phone: '(925) 555-0890', date: '2026-02-05', time: '8:00 PM', party: 2, amount: 200, status: 'forfeited', method: 'Zelle', bankLast4: '3345', settledAt: '2026-01-20 12:00:00', forfeitedAt: '2026-02-05 21:00:00', createdAt: '2026-01-20 11:55:00' },
+      { id: 'DEP-007', guest: 'Anna Williams', email: 'anna.w@proton.me', phone: '(415) 555-1234', date: '2026-02-08', time: '7:00 PM', party: 3, amount: 300, status: 'confirmed', method: 'USDC', bankLast4: null, walletAddr: '0x7a2...f4c1', settledAt: '2026-02-01 08:22:00', createdAt: '2026-02-01 08:20:15' },
+      { id: 'DEP-008', guest: 'Robert Chang', email: 'rchang@stanford.edu', phone: '(650) 555-5678', date: '2026-02-08', time: '8:30 PM', party: 2, amount: 200, status: 'applied', method: 'ACH', bankLast4: '9901', settledAt: '2026-01-22 14:10:00', appliedAt: '2026-02-01 21:45:00', createdAt: '2026-01-22 14:05:00' },
+    ];
+
+    const stats = {
+      totalDeposits: 14200,
+      confirmedCount: 48,
+      noShowRate: 2.1,
+      prevNoShowRate: 17.8,
+      chargebacks: 0,
+      prevChargebacks: 6,
+      avgDeposit: 225,
+      conversionRate: 94.2
+    };
+
+    // Utility Functions
+    function $(id) { return document.getElementById(id); }
+    function render() {
+      $('app').innerHTML = getView();
+      attachEvents();
+      lucide.createIcons();
+    }
+    function nav(view) {
+      state.currentView = view;
+      state.mobileMenuOpen = false;
+      window.scrollTo(0, 0);
+      render();
+    }
+    function setBookingStep(step) { state.bookingStep = step; render(); }
+    function selectPayment(method) { state.selectedPayment = method; render(); }
+    function setDashboardTab(tab) { state.dashboardTab = tab; state.selectedDeposit = null; render(); }
+    function setArchTab(tab) { state.archTab = tab; render(); }
+    function selectDeposit(id) { state.selectedDeposit = deposits.find(d => d.id === id); render(); }
+    function closeModal() { state.selectedDeposit = null; render(); }
+    function toggleConsent() { state.consentAccepted = !state.consentAccepted; render(); }
+    function connectPlaid() { state.plaidConnected = true; render(); }
+    function toggleMobileMenu() { state.mobileMenuOpen = !state.mobileMenuOpen; render(); }
+
+    function getStatusColor(status) {
+      const colors = {
+        confirmed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        settling: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+        pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        refunded: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+        forfeited: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+        applied: 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+      };
+      return colors[status] || colors.pending;
+    }
+
+    function isMobile() { return window.innerWidth < 768; }
+
+    // View Router
+    function getView() {
+      switch(state.currentView) {
+        case 'landing': return landingView();
+        case 'booking': return bookingView();
+        case 'dashboard': return dashboardView();
+        case 'architecture': return architectureView();
+        default: return landingView();
+      }
+    }
+
+    // Landing Page
+    function landingView() {
+      return `
+        <div class="min-h-screen">
+          <!-- Nav -->
+          <nav class="border-b border-slate-800 sticky top-0 glass z-50 safe-top">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center">
+                  <i data-lucide="lock" class="w-4 h-4 text-white"></i>
+                </div>
+                <span class="font-bold text-xl">ReserveLock</span>
+              </div>
+
+              <!-- Desktop Nav -->
+              <div class="hidden md:flex items-center gap-6">
+                <button onclick="nav('booking')" class="text-slate-400 hover:text-white transition">Guest Demo</button>
+                <button onclick="nav('dashboard')" class="text-slate-400 hover:text-white transition">Dashboard</button>
+                <button onclick="nav('architecture')" class="text-slate-400 hover:text-white transition">Docs</button>
+                <button class="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition">Get Started</button>
+              </div>
+
+              <!-- Mobile Menu Button -->
+              <button onclick="toggleMobileMenu()" class="md:hidden p-2">
+                <i data-lucide="${state.mobileMenuOpen ? 'x' : 'menu'}" class="w-6 h-6"></i>
+              </button>
+            </div>
+
+            <!-- Mobile Menu -->
+            ${state.mobileMenuOpen ? `
+              <div class="md:hidden border-t border-slate-800 px-4 py-4 space-y-3">
+                <button onclick="nav('booking')" class="block w-full text-left py-2 text-slate-300">Guest Demo</button>
+                <button onclick="nav('dashboard')" class="block w-full text-left py-2 text-slate-300">Dashboard</button>
+                <button onclick="nav('architecture')" class="block w-full text-left py-2 text-slate-300">Docs</button>
+                <button class="w-full py-3 bg-amber-500 text-white rounded-lg font-medium">Get Started</button>
+              </div>
+            ` : ''}
+          </nav>
+
+          <!-- Hero -->
+          <div class="relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-rose-500/5"></div>
+            <div class="absolute top-20 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-1/4 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl"></div>
+
+            <div class="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-24 relative">
+              <div class="text-center mb-12 md:mb-16">
+                <div class="inline-flex items-center gap-2 px-3 md:px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-sm mb-6">
+                  <i data-lucide="shield-check" class="w-4 h-4"></i>
+                  <span class="hidden sm:inline">Zero Chargebacks.</span> Irrevocable by Design.
+                </div>
+                <h1 class="text-4xl md:text-6xl font-bold mb-6 px-4">
+                  Deposits That<br>
+                  <span class="gradient-text">Actually Protect Revenue</span>
+                </h1>
+                <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-8 px-4">
+                  Replace reversible card holds with irrevocable cash deposits via ACH, Zelle, or USDC.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 px-4">
+                  <button onclick="nav('booking')" class="w-full sm:w-auto px-6 md:px-8 py-4 bg-gradient-to-r from-amber-500 to-rose-500 text-white font-semibold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2">
+                    See Guest Experience <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                  </button>
+                  <button onclick="nav('dashboard')" class="w-full sm:w-auto px-6 md:px-8 py-4 bg-slate-800 text-white font-semibold rounded-xl hover:bg-slate-700 transition">
+                    View Dashboard
+                  </button>
+                </div>
+              </div>
+
+              <!-- Stats -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-16 md:mb-24">
+                ${[
+                  { value: '87%', label: 'No-Show Reduction', sub: 'Average across customers' },
+                  { value: '100%', label: 'Chargebacks Eliminated', sub: 'By design, not policy' },
+                  { value: '$0.59', label: 'Cost Per Deposit', sub: 'vs $25+ per chargeback' },
+                  { value: '94%', label: 'Deposit Completion', sub: 'Guest conversion rate' }
+                ].map(s => `
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl md:rounded-2xl p-4 md:p-6 text-center">
+                    <div class="text-2xl md:text-4xl font-bold text-white mb-1">${s.value}</div>
+                    <div class="text-amber-400 font-medium text-sm md:text-base">${s.label}</div>
+                    <div class="text-slate-500 text-xs md:text-sm mt-1 hidden sm:block">${s.sub}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Problem/Solution -->
+          <div class="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-16">
+            <div class="grid md:grid-cols-2 gap-4 md:gap-8 mb-16 md:mb-24">
+              <div class="bg-red-950/20 border border-red-900/30 rounded-xl md:rounded-2xl p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-4 md:mb-6">
+                  <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <i data-lucide="x-circle" class="w-5 h-5 text-red-400"></i>
+                  </div>
+                  <h3 class="text-lg md:text-xl font-semibold">The Card Deposit Problem</h3>
+                </div>
+                <ul class="space-y-2 md:space-y-3">
+                  ${[
+                    'Chargebacks favor diners 95%+ of the time',
+                    'Stolen cards used for fraudulent bookings',
+                    'Holds feel "fake" — treated as optional',
+                    'Complex reconciliation timing',
+                    'Trapped in card network rules'
+                  ].map(item => `
+                    <li class="flex items-start gap-3 text-slate-300 text-sm md:text-base">
+                      <i data-lucide="ban" class="w-4 h-4 md:w-5 md:h-5 text-red-400 mt-0.5 flex-shrink-0"></i>
+                      ${item}
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+              <div class="bg-emerald-950/20 border border-emerald-900/30 rounded-xl md:rounded-2xl p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-4 md:mb-6">
+                  <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+                  </div>
+                  <h3 class="text-lg md:text-xl font-semibold">The Cash Deposit Solution</h3>
+                </div>
+                <ul class="space-y-2 md:space-y-3">
+                  ${[
+                    'Irrevocable once settled — no chargebacks',
+                    'Bank auth prevents stolen card fraud',
+                    'Real money out = real commitment',
+                    'Money in account, fully reconciled',
+                    'Disputes are contract law'
+                  ].map(item => `
+                    <li class="flex items-start gap-3 text-slate-300 text-sm md:text-base">
+                      <i data-lucide="check-circle" class="w-4 h-4 md:w-5 md:h-5 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                      ${item}
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            </div>
+
+            <!-- How It Works -->
+            <div class="mb-16 md:mb-24">
+              <h2 class="text-2xl md:text-3xl font-bold text-center mb-4">How It Works</h2>
+              <p class="text-slate-400 text-center mb-8 md:mb-12 max-w-2xl mx-auto px-4">Five steps from booking to bill credit</p>
+              <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+                ${[
+                  { icon: 'calendar', title: 'Guest Books', desc: 'Date, time, party' },
+                  { icon: 'file-text', title: 'Reviews Terms', desc: 'Policy + consent' },
+                  { icon: 'landmark', title: 'Links Bank', desc: 'Plaid verification' },
+                  { icon: 'banknote', title: 'Deposit Settles', desc: 'Irrevocable transfer' },
+                  { icon: 'check-circle', title: 'Bill Credit', desc: 'Applied at checkout' }
+                ].map((step, i) => `
+                  <div class="${i === 4 ? 'col-span-2 md:col-span-1' : ''}">
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-5 h-full">
+                      <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3 md:mb-4">
+                        <i data-lucide="${step.icon}" class="w-5 h-5 text-amber-400"></i>
+                      </div>
+                      <div class="text-white font-medium text-sm md:text-base mb-1">${step.title}</div>
+                      <div class="text-slate-400 text-xs md:text-sm">${step.desc}</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Payment Rails -->
+            <div class="mb-16 md:mb-24">
+              <h2 class="text-2xl md:text-3xl font-bold text-center mb-4">Payment Rails</h2>
+              <p class="text-slate-400 text-center mb-8 md:mb-12">All irrevocable once settled</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+                ${[
+                  { name: 'ACH (Dwolla)', speed: '1-2 days', cost: '$0.25', icon: '🏦' },
+                  { name: 'Zelle', speed: 'Instant', cost: 'Free', icon: '⚡' },
+                  { name: 'USDC (Circle)', speed: '~2 min', cost: 'Free', icon: '💎' },
+                  { name: 'Wire', speed: 'Same day', cost: '$15-25', icon: '🔒' }
+                ].map(rail => `
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6">
+                    <div class="text-2xl md:text-3xl mb-3 md:mb-4">${rail.icon}</div>
+                    <div class="text-white font-semibold text-sm md:text-base mb-2">${rail.name}</div>
+                    <div class="space-y-1 text-xs md:text-sm">
+                      <div class="flex justify-between">
+                        <span class="text-slate-500">Speed</span>
+                        <span class="text-slate-300">${rail.speed}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-slate-500">Cost</span>
+                        <span class="text-emerald-400">${rail.cost}</span>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Cost Comparison -->
+            <div class="mb-16 md:mb-24">
+              <h2 class="text-2xl md:text-3xl font-bold text-center mb-4">Cost Per Deposit</h2>
+              <p class="text-slate-400 text-center mb-8 md:mb-12">Total cost breakdown for ACH</p>
+              <div class="max-w-2xl mx-auto bg-slate-900/50 border border-slate-800 rounded-xl md:rounded-2xl p-6 md:p-8">
+                <div class="space-y-3 md:space-y-4 mb-6">
+                  ${[
+                    { item: 'Plaid Auth', cost: '$0.30' },
+                    { item: 'Dwolla ACH', cost: '$0.25' },
+                    { item: 'Twilio SMS', cost: '$0.04' }
+                  ].map(row => `
+                    <div class="flex justify-between items-center py-2 border-b border-slate-800">
+                      <span class="text-slate-300">${row.item}</span>
+                      <span class="text-white font-medium">${row.cost}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="flex justify-between items-center py-4 bg-emerald-500/10 rounded-lg px-4 mb-4">
+                  <span class="text-emerald-400 font-semibold">Total</span>
+                  <span class="text-emerald-400 font-bold text-xl md:text-2xl">$0.59</span>
+                </div>
+                <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div class="flex justify-between items-center">
+                    <span class="text-slate-300 text-sm">vs. Chargeback Cost</span>
+                    <span class="text-red-400 font-bold">$25-100+</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pricing -->
+            <div class="mb-16 md:mb-24">
+              <h2 class="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12">Pricing</h2>
+              <div class="grid md:grid-cols-3 gap-4 md:gap-8 max-w-5xl mx-auto">
+                ${[
+                  { name: 'Starter', price: '$99', period: '/mo', desc: 'Single location', features: ['500 deposits/mo', 'ACH + Zelle', 'Basic dashboard', 'Email support'] },
+                  { name: 'Professional', price: '$249', period: '/mo', desc: 'High-volume', features: ['Unlimited deposits', 'All payment rails', 'Full analytics', 'API access', 'Priority support'], popular: true },
+                  { name: 'Enterprise', price: 'Custom', period: '', desc: 'Restaurant groups', features: ['Multi-location', 'Dedicated manager', 'Custom integrations', 'White-label'] }
+                ].map(tier => `
+                  <div class="bg-slate-900/50 border ${tier.popular ? 'border-amber-500 md:scale-105' : 'border-slate-800'} rounded-xl md:rounded-2xl p-6 md:p-8 relative">
+                    ${tier.popular ? '<div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">Popular</div>' : ''}
+                    <div class="text-slate-400 text-sm mb-2">${tier.name}</div>
+                    <div class="flex items-baseline gap-1 mb-2">
+                      <span class="text-3xl md:text-4xl font-bold text-white">${tier.price}</span>
+                      <span class="text-slate-500">${tier.period}</span>
+                    </div>
+                    <div class="text-slate-500 text-sm mb-6">${tier.desc}</div>
+                    <ul class="space-y-2 md:space-y-3 mb-6 md:mb-8">
+                      ${tier.features.map(f => `
+                        <li class="flex items-center gap-2 text-slate-300 text-sm">
+                          <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                          ${f}
+                        </li>
+                      `).join('')}
+                    </ul>
+                    <button class="w-full py-3 ${tier.popular ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-800 hover:bg-slate-700'} text-white font-medium rounded-lg transition">
+                      ${tier.price === 'Custom' ? 'Contact Sales' : 'Get Started'}
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <footer class="border-t border-slate-800 py-8 md:py-12 safe-bottom">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center">
+                  <i data-lucide="lock" class="w-3 h-3 text-white"></i>
+                </div>
+                <span class="font-semibold">ReserveLock</span>
+              </div>
+              <div class="text-slate-500 text-sm">© 2026 ReserveLock</div>
+            </div>
+          </footer>
+        </div>
+      `;
+    }
+
+    // Booking View
+    function bookingView() {
+      const steps = [
+        { num: 1, label: 'Review' },
+        { num: 2, label: 'Consent' },
+        { num: 3, label: 'Payment' },
+        { num: 4, label: 'Confirm' }
+      ];
+
+      return `
+        <div class="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 safe-top safe-bottom">
+          <div class="max-w-lg mx-auto px-4 md:px-6 py-6 md:py-8">
+            <!-- Back -->
+            <button onclick="nav('landing')" class="flex items-center gap-2 text-slate-400 hover:text-white transition mb-6 md:mb-8">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+            </button>
+
+            <!-- Restaurant Header -->
+            <div class="text-center mb-6 md:mb-8">
+              <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 mx-auto mb-4 flex items-center justify-center text-3xl md:text-4xl">🍣</div>
+              <h1 class="text-xl md:text-2xl font-bold">Omakase Sato</h1>
+              <p class="text-slate-400 text-sm md:text-base">14-Seat Counter • $285/person</p>
+            </div>
+
+            <!-- Progress -->
+            <div class="flex items-center justify-center gap-1 md:gap-2 mb-6 md:mb-8">
+              ${steps.map((step, i) => `
+                <div class="flex items-center">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-medium ${state.bookingStep >= step.num ? 'bg-amber-500 text-white' : 'bg-slate-800 text-slate-500'}">
+                    ${state.bookingStep > step.num ? '<i data-lucide="check" class="w-4 h-4"></i>' : step.num}
+                  </div>
+                  ${i < steps.length - 1 ? `<div class="w-6 md:w-8 h-0.5 ${state.bookingStep > step.num ? 'bg-amber-500' : 'bg-slate-800'}"></div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- Step Content -->
+            <div class="bg-slate-900/50 border border-slate-800 rounded-xl md:rounded-2xl p-5 md:p-6">
+              ${state.bookingStep === 1 ? `
+                <h2 class="text-lg font-semibold mb-4">Review Your Reservation</h2>
+                <div class="bg-slate-800/50 rounded-xl p-4 mb-6">
+                  <div class="grid grid-cols-2 gap-3 md:gap-4 text-sm">
+                    <div><span class="text-slate-500">Date</span><div class="text-white">Fri, Feb 7, 2026</div></div>
+                    <div><span class="text-slate-500">Time</span><div class="text-white">7:30 PM</div></div>
+                    <div><span class="text-slate-500">Party</span><div class="text-white">2 guests</div></div>
+                    <div><span class="text-slate-500">Deposit</span><div class="text-amber-400 font-semibold">$200.00</div></div>
+                  </div>
+                </div>
+                <div class="bg-slate-800/30 rounded-xl p-4 mb-6">
+                  <h3 class="text-white font-medium mb-2 text-sm">Cancellation Policy</h3>
+                  <ul class="text-slate-400 text-xs md:text-sm space-y-1">
+                    <li>• <span class="text-emerald-400">Full refund</span> 48+ hours before</li>
+                    <li>• <span class="text-amber-400">50% refund</span> 24-48 hours before</li>
+                    <li>• <span class="text-red-400">No refund</span> under 24 hours / no-show</li>
+                  </ul>
+                </div>
+                <button onclick="setBookingStep(2)" class="w-full py-3 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-600 transition">Continue</button>
+              ` : ''}
+
+              ${state.bookingStep === 2 ? `
+                <h2 class="text-lg font-semibold mb-2">Digital Consent</h2>
+                <p class="text-slate-400 text-sm mb-4 md:mb-6">Review and accept to proceed</p>
+                <div class="bg-slate-800/30 rounded-xl p-4 mb-6 max-h-40 md:max-h-48 overflow-y-auto text-xs md:text-sm text-slate-400 scroll-smooth">
+                  <p class="mb-2"><strong class="text-white">Deposit Authorization</strong></p>
+                  <p class="mb-2">By proceeding, I authorize Omakase Sato to initiate a $200.00 transfer from my linked bank account.</p>
+                  <ul class="list-disc list-inside space-y-1 mb-2">
+                    <li>Deposit is irrevocable once settled</li>
+                    <li>Refunds subject to cancellation policy</li>
+                    <li>Deposit credited to final bill</li>
+                    <li>No-shows forfeit full amount</li>
+                  </ul>
+                </div>
+                <label class="flex items-start gap-3 mb-6 cursor-pointer" onclick="toggleConsent()">
+                  <div class="w-5 h-5 rounded border ${state.consentAccepted ? 'bg-amber-500 border-amber-500' : 'border-slate-600'} flex items-center justify-center mt-0.5 flex-shrink-0">
+                    ${state.consentAccepted ? '<i data-lucide="check" class="w-3 h-3 text-white"></i>' : ''}
+                  </div>
+                  <span class="text-slate-300 text-sm">I agree to the Deposit Authorization and Cancellation Policy</span>
+                </label>
+                <div class="flex gap-3">
+                  <button onclick="setBookingStep(1)" class="flex-1 py-3 bg-slate-800 text-slate-300 font-semibold rounded-xl hover:bg-slate-700 transition">Back</button>
+                  <button onclick="setBookingStep(3)" ${!state.consentAccepted ? 'disabled' : ''} class="flex-1 py-3 ${state.consentAccepted ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-700 cursor-not-allowed'} text-white font-semibold rounded-xl transition">Continue</button>
+                </div>
+              ` : ''}
+
+              ${state.bookingStep === 3 ? `
+                <h2 class="text-lg font-semibold mb-2">Connect Payment</h2>
+                <p class="text-slate-400 text-sm mb-4 md:mb-6">Link your bank for secure deposit</p>
+
+                ${!state.plaidConnected ? `
+                  <div class="space-y-3 mb-6">
+                    ${[
+                      { id: 'ach', name: 'Bank Account (ACH)', desc: 'Connect via Plaid', icon: '🏦' },
+                      { id: 'zelle', name: 'Zelle', desc: 'Instant transfer', icon: '⚡' },
+                      { id: 'usdc', name: 'USDC', desc: 'Stablecoin', icon: '💎' }
+                    ].map(method => `
+                      <button onclick="selectPayment('${method.id}')" class="w-full p-4 rounded-xl border text-left flex items-center gap-3 md:gap-4 transition ${state.selectedPayment === method.id ? 'border-amber-500 bg-amber-500/10' : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'}">
+                        <span class="text-xl md:text-2xl">${method.icon}</span>
+                        <div class="flex-1 min-w-0">
+                          <div class="text-white font-medium text-sm md:text-base">${method.name}</div>
+                          <div class="text-slate-400 text-xs md:text-sm">${method.desc}</div>
+                        </div>
+                        ${state.selectedPayment === method.id ? '<i data-lucide="check-circle" class="w-5 h-5 text-amber-500 flex-shrink-0"></i>' : ''}
+                      </button>
+                    `).join('')}
+                  </div>
+                  ${state.selectedPayment === 'ach' ? `
+                    <button onclick="connectPlaid()" class="w-full py-4 bg-slate-800 border border-slate-700 text-white font-medium rounded-xl hover:bg-slate-700 transition flex items-center justify-center gap-3 mb-4">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#111"/><path d="M6 8h3v8H6V8zm4.5 0H14v8h-3.5V8zm5 0H19v8h-3.5V8z" fill="#fff"/></svg>
+                      Connect with Plaid
+                    </button>
+                  ` : ''}
+                  ${state.selectedPayment === 'zelle' ? `
+                    <div class="bg-slate-800/50 rounded-xl p-4 mb-4">
+                      <p class="text-slate-300 text-sm mb-2">Send $200 to:</p>
+                      <div class="bg-slate-900 rounded-lg p-3 flex items-center justify-between">
+                        <span class="text-white font-mono text-xs md:text-sm truncate">deposits@omakasesato.com</span>
+                        <button class="text-amber-400 text-sm ml-2 flex-shrink-0">Copy</button>
+                      </div>
+                      <p class="text-slate-500 text-xs mt-2">Code: <span class="text-amber-400 font-mono">OS-4821</span></p>
+                    </div>
+                  ` : ''}
+                ` : `
+                  <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+                      </div>
+                      <div class="min-w-0">
+                        <div class="text-emerald-400 font-medium">Bank Connected</div>
+                        <div class="text-slate-400 text-sm">Chase ••••4521</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="bg-slate-800/50 rounded-xl p-4 mb-6">
+                    <div class="flex justify-between mb-2 text-sm">
+                      <span class="text-slate-400">Deposit</span>
+                      <span class="text-white font-semibold">$200.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                      <span class="text-slate-400">Settlement</span>
+                      <span class="text-slate-300">1-2 business days</span>
+                    </div>
+                  </div>
+                `}
+                <div class="flex gap-3">
+                  <button onclick="setBookingStep(2)" class="flex-1 py-3 bg-slate-800 text-slate-300 font-semibold rounded-xl hover:bg-slate-700 transition">Back</button>
+                  <button onclick="setBookingStep(4)" ${!state.plaidConnected ? 'disabled' : ''} class="flex-1 py-3 ${state.plaidConnected ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-700 cursor-not-allowed'} text-white font-semibold rounded-xl transition">
+                    ${state.plaidConnected ? 'Authorize $200' : 'Connect First'}
+                  </button>
+                </div>
+              ` : ''}
+
+              ${state.bookingStep === 4 ? `
+                <div class="text-center py-2 md:py-4">
+                  <div class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="check-circle" class="w-7 h-7 md:w-8 md:h-8 text-emerald-400"></i>
+                  </div>
+                  <h2 class="text-xl font-semibold mb-2">Confirmed!</h2>
+                  <p class="text-slate-400 text-sm mb-6">Deposit processing • 1-2 business days</p>
+
+                  <div class="bg-slate-800/50 rounded-xl p-4 text-left mb-6">
+                    <div class="space-y-2 text-sm">
+                      <div class="flex justify-between"><span class="text-slate-400">Confirmation</span><span class="text-amber-400 font-mono">OS-2026-4821</span></div>
+                      <div class="flex justify-between"><span class="text-slate-400">Date</span><span class="text-white">Fri, Feb 7</span></div>
+                      <div class="flex justify-between"><span class="text-slate-400">Time</span><span class="text-white">7:30 PM</span></div>
+                      <div class="flex justify-between"><span class="text-slate-400">Party</span><span class="text-white">2 guests</span></div>
+                      <div class="flex justify-between"><span class="text-slate-400">Deposit</span><span class="text-emerald-400">$200.00</span></div>
+                    </div>
+                  </div>
+
+                  <div class="bg-slate-800/30 rounded-xl p-4 mb-4">
+                    <div class="w-24 h-24 md:w-32 md:h-32 bg-white rounded-lg mx-auto mb-3 flex items-center justify-center">
+                      <div class="grid grid-cols-5 gap-0.5 md:gap-1">
+                        ${Array(25).fill(0).map(() => `<div class="w-3 h-3 md:w-4 md:h-4 ${Math.random() > 0.5 ? 'bg-slate-900' : 'bg-white'}"></div>`).join('')}
+                      </div>
+                    </div>
+                    <p class="text-slate-500 text-xs">Show QR on arrival</p>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Dashboard View
+    function dashboardView() {
+      return `
+        <div class="min-h-screen bg-slate-950 safe-top safe-bottom">
+          <!-- Mobile Header -->
+          <div class="md:hidden sticky top-0 glass border-b border-slate-800 px-4 py-3 flex items-center justify-between z-40">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center">
+                <i data-lucide="lock" class="w-4 h-4 text-white"></i>
+              </div>
+              <span class="font-bold">Dashboard</span>
+            </div>
+            <button onclick="nav('landing')" class="text-slate-400">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <!-- Desktop Sidebar -->
+          <div class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-slate-900/50 border-r border-slate-800 p-6">
+            <div class="flex items-center gap-2 mb-8">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center">
+                <i data-lucide="lock" class="w-4 h-4 text-white"></i>
+              </div>
+              <span class="font-bold">ReserveLock</span>
+            </div>
+            <div class="mb-6">
+              <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">Restaurant</div>
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-lg">🍣</div>
+                <div>
+                  <div class="text-white font-medium">Omakase Sato</div>
+                  <div class="text-slate-500 text-sm">14 seats</div>
+                </div>
+              </div>
+            </div>
+            <nav class="space-y-1">
+              ${[
+                { id: 'deposits', icon: 'banknote', label: 'Deposits' },
+                { id: 'analytics', icon: 'bar-chart-3', label: 'Analytics' },
+                { id: 'settings', icon: 'settings', label: 'Settings' }
+              ].map(item => `
+                <button onclick="setDashboardTab('${item.id}')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition ${state.dashboardTab === item.id ? 'bg-amber-500/10 text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}">
+                  <i data-lucide="${item.icon}" class="w-5 h-5"></i>
+                  ${item.label}
+                </button>
+              `).join('')}
+            </nav>
+            <div class="absolute bottom-6 left-6 right-6">
+              <button onclick="nav('landing')" class="w-full flex items-center gap-2 text-slate-500 hover:text-white transition text-sm">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+              </button>
+            </div>
+          </div>
+
+          <!-- Mobile Tab Bar -->
+          <div class="md:hidden flex border-b border-slate-800 px-2 overflow-x-auto">
+            ${[
+              { id: 'deposits', icon: 'banknote', label: 'Deposits' },
+              { id: 'analytics', icon: 'bar-chart-3', label: 'Analytics' },
+              { id: 'settings', icon: 'settings', label: 'Settings' }
+            ].map(item => `
+              <button onclick="setDashboardTab('${item.id}')" class="flex-1 flex flex-col items-center gap-1 px-4 py-3 transition ${state.dashboardTab === item.id ? 'text-amber-400 border-b-2 border-amber-400' : 'text-slate-500'}">
+                <i data-lucide="${item.icon}" class="w-5 h-5"></i>
+                <span class="text-xs">${item.label}</span>
+              </button>
+            `).join('')}
+          </div>
+
+          <!-- Main Content -->
+          <div class="md:ml-64 p-4 md:p-8">
+            <div class="max-w-6xl">
+              <!-- Stats -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+                ${[
+                  { label: 'Deposits', value: '$' + stats.totalDeposits.toLocaleString(), sub: 'This month', icon: 'dollar-sign', color: 'emerald' },
+                  { label: 'Confirmed', value: stats.confirmedCount, sub: stats.conversionRate + '%', icon: 'check-circle', color: 'blue' },
+                  { label: 'No-Show', value: stats.noShowRate + '%', sub: '↓88%', icon: 'trending-down', color: 'amber' },
+                  { label: 'Chargebacks', value: stats.chargebacks, sub: 'Was ' + stats.prevChargebacks, icon: 'shield', color: 'rose' }
+                ].map(stat => `
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-5">
+                    <div class="flex items-center justify-between mb-2 md:mb-3">
+                      <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-${stat.color}-500/10 flex items-center justify-center">
+                        <i data-lucide="${stat.icon}" class="w-4 h-4 md:w-5 md:h-5 text-${stat.color}-400"></i>
+                      </div>
+                    </div>
+                    <div class="text-xl md:text-2xl font-bold mb-0.5">${stat.value}</div>
+                    <div class="text-slate-500 text-xs md:text-sm">${stat.label}</div>
+                  </div>
+                `).join('')}
+              </div>
+
+              ${state.dashboardTab === 'deposits' ? `
+                <!-- Deposits List -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+                  <div class="p-4 border-b border-slate-800">
+                    <h2 class="font-semibold">Recent Deposits</h2>
+                  </div>
+                  <div class="divide-y divide-slate-800/50">
+                    ${deposits.map(dep => `
+                      <div onclick="selectDeposit('${dep.id}')" class="p-4 hover:bg-slate-800/30 transition cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                          <div class="font-medium">${dep.guest}</div>
+                          <span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(dep.status)}">
+                            ${dep.status.charAt(0).toUpperCase() + dep.status.slice(1)}
+                          </span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm text-slate-400">
+                          <span>${dep.date} • ${dep.time}</span>
+                          <span class="font-medium text-white">$${dep.amount}</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              ${state.dashboardTab === 'analytics' ? `
+                <div class="space-y-4 md:space-y-6">
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 md:p-6">
+                    <h3 class="font-semibold mb-4">No-Show Comparison</h3>
+                    <div class="space-y-4">
+                      <div>
+                        <div class="flex justify-between text-sm mb-1">
+                          <span class="text-slate-400">Before (Cards)</span>
+                          <span class="text-red-400">${stats.prevNoShowRate}%</span>
+                        </div>
+                        <div class="h-3 md:h-4 bg-slate-800 rounded-full overflow-hidden">
+                          <div class="h-full bg-red-500/50 rounded-full" style="width: ${stats.prevNoShowRate * 5}%"></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="flex justify-between text-sm mb-1">
+                          <span class="text-slate-400">After (Cash)</span>
+                          <span class="text-emerald-400">${stats.noShowRate}%</span>
+                        </div>
+                        <div class="h-3 md:h-4 bg-slate-800 rounded-full overflow-hidden">
+                          <div class="h-full bg-emerald-500 rounded-full" style="width: ${stats.noShowRate * 5}%"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-center">
+                      <div class="text-emerald-400 font-bold text-2xl">88%</div>
+                      <div class="text-slate-400 text-sm">Reduction</div>
+                    </div>
+                  </div>
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 md:p-6">
+                    <h3 class="font-semibold mb-4">Revenue Protected</h3>
+                    <div class="space-y-3">
+                      <div class="flex justify-between py-2 border-b border-slate-800">
+                        <span class="text-slate-400 text-sm">Chargebacks Eliminated</span>
+                        <span class="font-semibold">$3,600/mo</span>
+                      </div>
+                      <div class="flex justify-between py-2 border-b border-slate-800">
+                        <span class="text-slate-400 text-sm">No-Shows Prevented</span>
+                        <span class="font-semibold">$12,540/mo</span>
+                      </div>
+                      <div class="flex justify-between py-2">
+                        <span class="font-semibold">Total Benefit</span>
+                        <span class="text-emerald-400 font-bold text-xl">$16,140</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${state.dashboardTab === 'settings' ? `
+                <div class="space-y-4 md:space-y-6">
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 md:p-6">
+                    <h3 class="font-semibold mb-4">Deposit Settings</h3>
+                    <div class="space-y-4">
+                      <div>
+                        <label class="text-slate-400 text-sm mb-2 block">Amount per person</label>
+                        <input type="number" value="100" class="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-white">
+                      </div>
+                      <div>
+                        <label class="text-slate-400 text-sm mb-2 block">Payment Methods</label>
+                        <div class="space-y-2">
+                          ${['ACH', 'Zelle', 'USDC'].map(m => `
+                            <label class="flex items-center gap-3 text-slate-300 cursor-pointer">
+                              <input type="checkbox" checked class="rounded bg-slate-800 border-slate-700">
+                              ${m}
+                            </label>
+                          `).join('')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 md:p-6">
+                    <h3 class="font-semibold mb-4">Cancellation Policy</h3>
+                    <div class="space-y-3 text-sm">
+                      <div class="flex items-center gap-3">
+                        <input type="number" value="48" class="w-16 p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-center">
+                        <span class="text-slate-400">+ hours: Full refund</span>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <input type="number" value="24" class="w-16 p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-center">
+                        <span class="text-slate-400">-48 hours: 50%</span>
+                      </div>
+                    </div>
+                    <button class="mt-6 w-full md:w-auto px-6 py-3 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition">Save</button>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Deposit Detail Modal -->
+          ${state.selectedDeposit ? `
+            <div class="fixed inset-0 bg-black/60 flex items-end md:items-center justify-center z-50" onclick="closeModal()">
+              <div class="bg-slate-900 border-t md:border border-slate-800 rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-lg md:mx-4 max-h-[85vh] overflow-y-auto safe-bottom" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-6">
+                  <h3 class="text-lg font-semibold">Deposit Details</h3>
+                  <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                  </button>
+                </div>
+                <div class="space-y-3 text-sm mb-6">
+                  <div class="flex justify-between"><span class="text-slate-400">ID</span><span class="text-amber-400 font-mono">${state.selectedDeposit.id}</span></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Guest</span><span>${state.selectedDeposit.guest}</span></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Email</span><span class="truncate ml-4">${state.selectedDeposit.email}</span></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Reservation</span><span>${state.selectedDeposit.date}</span></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Amount</span><span class="font-semibold">$${state.selectedDeposit.amount}</span></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Method</span><span>${state.selectedDeposit.method || '—'}</span></div>
+                  <div class="flex justify-between"><span class="text-slate-400">Status</span><span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(state.selectedDeposit.status)}">${state.selectedDeposit.status}</span></div>
+                </div>
+
+                <div class="bg-slate-800/50 rounded-xl p-4 mb-6">
+                  <h4 class="text-xs font-medium mb-3 text-slate-400 uppercase tracking-wider">Audit Trail</h4>
+                  <div class="space-y-2 text-xs">
+                    <div class="flex gap-3"><span class="text-slate-500 w-28 flex-shrink-0">${state.selectedDeposit.createdAt.split(' ')[0]}</span><span class="text-slate-300">Initiated</span></div>
+                    ${state.selectedDeposit.settledAt ? `<div class="flex gap-3"><span class="text-slate-500 w-28 flex-shrink-0">${state.selectedDeposit.settledAt.split(' ')[0]}</span><span class="text-emerald-400">Settled</span></div>` : ''}
+                    ${state.selectedDeposit.appliedAt ? `<div class="flex gap-3"><span class="text-slate-500 w-28 flex-shrink-0">${state.selectedDeposit.appliedAt.split(' ')[0]}</span><span class="text-purple-400">Applied</span></div>` : ''}
+                    ${state.selectedDeposit.refundedAt ? `<div class="flex gap-3"><span class="text-slate-500 w-28 flex-shrink-0">${state.selectedDeposit.refundedAt.split(' ')[0]}</span><span class="text-slate-400">Refunded</span></div>` : ''}
+                    ${state.selectedDeposit.forfeitedAt ? `<div class="flex gap-3"><span class="text-slate-500 w-28 flex-shrink-0">${state.selectedDeposit.forfeitedAt.split(' ')[0]}</span><span class="text-rose-400">Forfeited</span></div>` : ''}
+                  </div>
+                </div>
+
+                ${state.selectedDeposit.status === 'confirmed' ? `
+                  <div class="flex gap-3">
+                    <button class="flex-1 py-3 bg-slate-800 text-slate-300 font-medium rounded-lg">Remind</button>
+                    <button class="flex-1 py-3 bg-rose-500/10 text-rose-400 font-medium rounded-lg">Refund</button>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Architecture View
+    function architectureView() {
+      return `
+        <div class="min-h-screen bg-slate-950 safe-top safe-bottom">
+          <div class="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+            <button onclick="nav('landing')" class="flex items-center gap-2 text-slate-400 hover:text-white transition mb-6 md:mb-8">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+            </button>
+
+            <h1 class="text-2xl md:text-3xl font-bold mb-2">Architecture</h1>
+            <p class="text-slate-400 mb-6 md:mb-8">Technical documentation</p>
+
+            <!-- Tabs -->
+            <div class="flex gap-1 mb-6 md:mb-8 bg-slate-900/50 p-1 rounded-lg overflow-x-auto">
+              ${['overview', 'plaid', 'payments', 'webhooks'].map(tab => `
+                <button onclick="setArchTab('${tab}')" class="px-3 md:px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${state.archTab === tab ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}">
+                  ${tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              `).join('')}
+            </div>
+
+            ${state.archTab === 'overview' ? `
+              <div class="grid md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                ${[
+                  { name: 'Plaid', role: 'Bank linking', cost: '$0.30/link' },
+                  { name: 'Dwolla', role: 'ACH processing', cost: '$0.25/txn' },
+                  { name: 'Circle', role: 'USDC settlement', cost: 'Free' }
+                ].map(svc => `
+                  <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-5">
+                    <div class="text-white font-semibold mb-1">${svc.name}</div>
+                    <div class="text-slate-400 text-sm mb-2">${svc.role}</div>
+                    <div class="text-emerald-400 text-sm">${svc.cost}</div>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6 overflow-x-auto">
+                <h3 class="font-semibold mb-4">System Architecture</h3>
+                <pre class="text-slate-300 text-xs md:text-sm">
+┌─────────┐    ┌────────────┐    ┌───────────┐
+│  Guest  │───▶│ ReserveLock│───▶│ Dashboard │
+│ Browser │    │    API     │    │           │
+└─────────┘    └─────┬──────┘    └───────────┘
+                     │
+       ┌─────────────┼─────────────┐
+       │             │             │
+       ▼             ▼             ▼
+   ┌───────┐    ┌────────┐    ┌────────┐
+   │ Plaid │    │ Dwolla │    │ Circle │
+   │ Auth  │    │  ACH   │    │  USDC  │
+   └───────┘    └────────┘    └────────┘</pre>
+              </div>
+            ` : ''}
+
+            ${state.archTab === 'plaid' ? `
+              <div class="space-y-4 md:space-y-6">
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6">
+                  <h3 class="font-semibold mb-4">1. Create Link Token</h3>
+                  <pre class="bg-slate-950 rounded-lg p-3 md:p-4 overflow-x-auto text-xs md:text-sm"><code class="text-emerald-400">const response = await plaidClient
+  .linkTokenCreate({
+    user: { client_user_id: odId },
+    client_name: 'ReserveLock',
+    products: ['auth', 'identity'],
+    country_codes: ['US'],
+  });
+
+return { link_token: response.link_token };</code></pre>
+                </div>
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6">
+                  <h3 class="font-semibold mb-4">2. Exchange Token</h3>
+                  <pre class="bg-slate-950 rounded-lg p-3 md:p-4 overflow-x-auto text-xs md:text-sm"><code class="text-emerald-400">const token = await plaidClient
+  .itemPublicTokenExchange({
+    public_token: publicToken
+  });
+
+const processor = await plaidClient
+  .processorTokenCreate({
+    access_token: token.access_token,
+    account_id: accountId,
+    processor: 'dwolla'
+  });</code></pre>
+                </div>
+              </div>
+            ` : ''}
+
+            ${state.archTab === 'payments' ? `
+              <div class="space-y-4 md:space-y-6">
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6">
+                  <h3 class="font-semibold mb-4">Dwolla ACH</h3>
+                  <pre class="bg-slate-950 rounded-lg p-3 md:p-4 overflow-x-auto text-xs md:text-sm"><code class="text-emerald-400">const transfer = await dwolla.post(
+  'transfers', {
+  _links: {
+    source: { href: customerUrl },
+    destination: { href: restaurantUrl }
+  },
+  amount: {
+    currency: 'USD',
+    value: '200.00'
+  },
+  metadata: { reservationId }
+});
+
+// IRREVOCABLE once status='processed'</code></pre>
+                </div>
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6">
+                  <h3 class="font-semibold mb-4">Circle USDC</h3>
+                  <pre class="bg-slate-950 rounded-lg p-3 md:p-4 overflow-x-auto text-xs md:text-sm"><code class="text-emerald-400">const payment = await circle
+  .createPayment({
+    amount: {
+      amount: '200.00',
+      currency: 'USD'
+    },
+    settlementCurrency: 'USD',
+    paymentMethods: [{
+      type: 'blockchain',
+      chain: 'ETH'
+    }]
+  });
+
+// Settlement: ~2-5 minutes</code></pre>
+                </div>
+              </div>
+            ` : ''}
+
+            ${state.archTab === 'webhooks' ? `
+              <div class="space-y-4 md:space-y-6">
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 md:p-6">
+                  <h3 class="font-semibold mb-4">Webhook Handler</h3>
+                  <pre class="bg-slate-950 rounded-lg p-3 md:p-4 overflow-x-auto text-xs md:text-sm"><code class="text-emerald-400">app.post('/webhooks/dwolla',
+  async (req, res) => {
+  const { topic, resourceId } = req.body;
+
+  if (topic === 'transfer_completed') {
+    // IRREVOCABLE - update status
+    await db.deposits.update({
+      where: { transferId: resourceId },
+      data: {
+        status: 'confirmed',
+        settledAt: new Date()
+      }
+    });
+    await sendConfirmationSMS(phone);
+  }
+
+  res.status(200).send('OK');
+});</code></pre>
+                </div>
+                <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 md:p-6">
+                  <h3 class="font-semibold mb-2">Infrastructure Cost</h3>
+                  <p class="text-slate-400 text-sm mb-4">Monthly MVP deployment</p>
+                  <div class="grid grid-cols-4 gap-2 md:gap-4 text-center">
+                    <div><div class="text-lg md:text-2xl font-bold">$99</div><div class="text-slate-500 text-xs">Plaid</div></div>
+                    <div><div class="text-lg md:text-2xl font-bold">$100</div><div class="text-slate-500 text-xs">Dwolla</div></div>
+                    <div><div class="text-lg md:text-2xl font-bold">$50</div><div class="text-slate-500 text-xs">Twilio</div></div>
+                    <div><div class="text-lg md:text-2xl font-bold text-emerald-400">~$250</div><div class="text-slate-500 text-xs">Total</div></div>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function attachEvents() {}
+
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
